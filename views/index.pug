@@ -1,0 +1,11 @@
+extends layout
+
+block content
+  div.container-fluid
+    h1.page-header #{title}
+    form(method="POST", action="/")
+      h4 Enter a URL to 'shorten'
+      input.form-control(type="text", name="urli", value=" ")
+      input.btn.btn-default.margin(type="submit" value="shorten ;)") 
+    h4 output:
+    code #{response}
