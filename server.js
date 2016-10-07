@@ -87,30 +87,33 @@ app.post('/', urlencodedParser, function(req, res){ //if path empty, post from f
 		var alphInd;
 		var num;
 		var dblength;
-		
-		collection.find({}, {'sort': [['urlid', 'desc']]}).toArray(function(err, doc){
-			
-			var uniqueIdA = doc[0].urlid.split('')[0];
-			alphInd = alph.indexOf(uniqueIdA);
-			console.log(alphInd)
-			
-			collection.count(function(err, cnt){
-				if (err) {
-					handleError(res, err.message, "Failed to sum number of records in collection.");
+		collection.count(function(err, cnt){
+			if (err) {
+				handleError(res, err.message, "Failed to sum number of records in collection.");
+			} else {
+				dblength = cnt;
+				if (dblength >= alph.length) { //start over at 0
+					num = dblength % alph.length;
 				} else {
-					dblength = cnt;
-					if (dblength >= alph.length) { //start over at 0
-						num = dblength % alph.length;
+					num = dblength+1;
+				}
+				collection.find({}, {'sort': [['urlid', 'desc']]}).toArray(function(err, doc){
+					if (err) {
+						handleError(res, err.message, "collection is empty.");
 					} else {
-						num = dblength+1;
-					}
-					if (alphInd == undefined) {
-						alphInd = 0;
-					} else {
-						if (num > alph.length) {
-							alphInd++; //increment alphabet char
+						if (doc[0] == undefined) {
+							alphInd = 0;
+						} else {
+							var uniqueIdA = doc[0].urlid.split('')[0];
+							alphInd = alph.indexOf(uniqueIdA);
+							console.log(alphInd)
 						}
 					}
+					if (num > alph.length) {
+						alphInd++; //increment alphabet char
+					}
+		
+					
 					uniqueId = alph[alphInd]+""+num;
 					var shortened = ""+newUrl+""+uniqueId+"";
 					var insertDb = {
@@ -130,13 +133,17 @@ app.post('/', urlencodedParser, function(req, res){ //if path empty, post from f
 							});
 						}
 					});
-				}
-			});
+				});
+			}
 		});
 		
 	}
 });
 
 function formatOutput(doc) {
-	return JSON.stringify(doc)
+	var response = {
+		input: doc.input,
+		output: doc.output
+	}
+	return JSON.stringify(response)
 }
