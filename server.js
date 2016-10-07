@@ -21,7 +21,7 @@ app.use(urlencodedParser);
 //this is how I'm getting the .env MONGOLAB_URI loaded:
 dotenv.load();
 var MongoClient = mongodb.MongoClient;
-var uri = process.env.MONGOLAB_URI;
+var uri = process.env.MONGODB_URI;
 var db;
 MongoClient.connect(uri, function (err, database) {
   	if (err) {
