@@ -4,6 +4,7 @@ var bodyParser = require("body-parser");
 var mongodb = require("mongodb");
 var dotenv = require('dotenv');
 var url = require('url');
+var pug = require('pug');
 var ObjectID = mongodb.ObjectID;
 
 var app = express();
@@ -17,11 +18,10 @@ app.use(bodyParser.json());
 var urlencodedParser = bodyParser.urlencoded({ extended: false })
 app.use(urlencodedParser);
 
-//this is how I'm getting the .env stuff loaded:
+//this is how I'm getting the .env MONGOLAB_URI loaded:
 dotenv.load();
 var MongoClient = mongodb.MongoClient;
 var uri = process.env.MONGOLAB_URI;
-console.log(uri)
 var db;
 MongoClient.connect(uri, function (err, database) {
   	if (err) {
@@ -35,10 +35,6 @@ MongoClient.connect(uri, function (err, database) {
 			var port = server.address().port;
 			console.log('App now running on port', port);
 		});
-    	// do some work here with the database.
-
-    	//Close connection
-    	//db.close();
 	}
 });
 
@@ -56,12 +52,14 @@ app.get('/', function(req, res){
 	});
 });
 
-
-app.get(/(.*)/, function (req, res) { //regexp checks if at least one char in path
+var alph = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+var alphInd;
+app.get(/(.*)/, function (req, res) { //regexp checks if at least one char in path of address bar
 	var outputPath = url.parse(req.url).pathname;
 	//pathname includes slash...so remove it . 
 	//we're looking for an alpha-numeric id, i.e. 'a1', so .replace() works here
 	outputPath = outputPath.replace('/', '');
+	alphInd = alph.indexOf(outputPath.split()[0])
 	var collection = db.collection('fcc_urls');
 	var inputUrl;
 	collection.findOne({urlid: outputPath}, function(err, doc){
@@ -76,7 +74,7 @@ app.get(/(.*)/, function (req, res) { //regexp checks if at least one char in pa
 });
 
 app.post('/', urlencodedParser, function(req, res){ //if path empty, post from form
-	//concatenated parts of host url (.herokuapp. or in build stage 'localhost:8080')
+	//concatenated parts of host url (herokuapp.com or, if in build stage, 'localhost:8080')
 	newUrl = req.protocol + '://'+ req.get('host') + req.originalUrl;
 	//regexp to check for 'http(s)://chars.' in input url
 	//very basic regexp compared to some 
@@ -86,47 +84,56 @@ app.post('/', urlencodedParser, function(req, res){ //if path empty, post from f
 		handleError(res, "Invalid URL", "Must contain 'http://' or 'https://' plus text and at least one '.'", 400);
 	} else {
 		var collection = db.collection('fcc_urls');
-		var alph = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
 		var alphInd;
 		var num;
 		var dblength;
-		collection.count(function(err, cnt){
-			if (err) {
-				handleError(res, err.message, "Failed to sum number of records in collection.");
-			} else {
-				dblength = cnt;
-				if (dblength >= alph.length) {
-					num = dblength % alph.length;
-					if (num > 9) {
-						alphInd = 1; //need to change this... thinking...
-					}
+		
+		collection.find({}, {'sort': [['urlid', 'desc']]}).toArray(function(err, doc){
+			
+			var uniqueIdA = doc[0].urlid.split('')[0];
+			alphInd = alph.indexOf(uniqueIdA);
+			console.log(alphInd)
+			
+			collection.count(function(err, cnt){
+				if (err) {
+					handleError(res, err.message, "Failed to sum number of records in collection.");
 				} else {
-					alphInd = 0;
-					num = dblength+1;
-				}
-				var uniqueId = alph[alphInd]+""+num;
-				var shortened = ""+newUrl+""+uniqueId+"";
-				var showUrl = {
-					input: req.body.urli,
-					output: shortened,
-					urlid: uniqueId
-				};
-
-				collection.insertOne(showUrl, function(err, doc){
-					if (err) {
-						handleError(res, err.message, "Failed to shorten URL.");
+					dblength = cnt;
+					if (dblength >= alph.length) { //start over at 0
+						num = dblength % alph.length;
 					} else {
-						res.render('index', {
-							title: 'FCC URL Shortener Microservice',
-							response: formatOutput(doc.ops[0]),
-							link: shortened
-						});
-
-					//	res.status(201).json(doc.ops[0]);
+						num = dblength+1;
 					}
-				});
-			}
+					if (alphInd == undefined) {
+						alphInd = 0;
+					} else {
+						if (num > alph.length) {
+							alphInd++; //increment alphabet char
+						}
+					}
+					uniqueId = alph[alphInd]+""+num;
+					var shortened = ""+newUrl+""+uniqueId+"";
+					var insertDb = {
+						input: req.body.urli,
+						output: shortened,
+						urlid: uniqueId
+					};
+
+					collection.insertOne(insertDb, function(err, doc){
+						if (err) {
+							handleError(res, err.message, "Failed to shorten URL.");
+						} else {
+							res.render('index', {
+								title: 'FCC URL Shortener Microservice',
+								response: formatOutput(doc.ops[0]),
+								link: shortened
+							});
+						}
+					});
+				}
+			});
 		});
+		
 	}
 });
 
