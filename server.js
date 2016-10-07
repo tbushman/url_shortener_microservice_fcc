@@ -3,7 +3,6 @@ var path = require("path");
 var bodyParser = require("body-parser");
 var mongodb = require("mongodb");
 var dotenv = require('dotenv');
-
 var ObjectID = mongodb.ObjectID;
 
 var app = express();
@@ -48,19 +47,16 @@ function handleError(res, reason, message, code) {
   res.status(code || 500).json({"error": message});
 }
 
+var newUrl;
 app.get('/', function(req, res){
-//app.get(/(.+)/, function (req, res) { //regexp checks if at least one char in path
-/*	var newUrl = url.parse(req.url).pathname;
-	if ( err) {
+//app.get(/(.*)/, function (req, res) { //regexp checks if at least one char in path
+	//var inputUrl = url.parse(req.url);
+	newUrl = req.protocol + '://'+ req.get('host') + req.originalUrl;
+	//url.format(inputUrl)
+	console.log(newUrl)
+	/*if ( err) {
 		handleError(res, "Invalid URL", "Must contain ... etc", 400);
-	} 
-	db.collection(fcc_urls).insertOne(newUrl, function(err, doc){
-		if (err) {
-			handleError(res, err.message, "Failed to shorten URL.");
-		} else {
-			res.status(201).json(doc.ops[0]);
-		}
-	});*/
+	} */
 	res.render('index', {
 		title: 'FCC URL Shortener Microservice'//,
 		//response: formatOutput(doc)
@@ -68,19 +64,41 @@ app.get('/', function(req, res){
 });
 
 app.post('/', urlencodedParser, function(req, res){ //if path empty, post from form
-	var newUrl = {user: req.body.urli, shortened: "test"};	
+	//regexp for 'http(s)://chars.'
+	newUrl = req.protocol + '://'+ req.get('host') + req.originalUrl;
 	var re = /(http(s)*:\/\/)+[\w]+[\.]+/;
-	if (!re.test(newUrl)) {
-		handleError(res, "Invalid URL", "Must contain ... etc", 400);
+	var test = re.test(req.body.urli);
+	if (test == false) {
+		handleError(res, "Invalid URL", "Must contain 'http://' or 'https://' plus text and at least one '.'", 400);
 	} else {
 		var collection = db.collection('fcc_urls');
-		collection.insertOne(newUrl, function(err, doc){
+		var alph = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+		var alphInd;
+		var num;
+		var dblength = collection.find().count();
+		if (dblength >= alph.length) {
+			num = dblength % alph.length;
+			if (num > 9) {
+				alphInd = 1; //need to change this... thinking...
+			}
+		} else {
+			alphInd = 0;
+			num = dblength+1;
+		}
+		var shortened = ""+newUrl+""+alph[alphInd]+""+num+"";
+		var showUrl = {
+			input: req.body.urli,
+			output: shortened
+		};
+		
+		collection.insertOne(showUrl, function(err, doc){
 			if (err) {
 				handleError(res, err.message, "Failed to shorten URL.");
 			} else {
 				res.render('index', {
 					title: 'FCC URL Shortener Microservice',
-					response: formatOutput(doc)
+					response: formatOutput(doc.ops[0]),
+					link: req.body.urli
 				});
 				
 			//	res.status(201).json(doc.ops[0]);
